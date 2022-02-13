@@ -1,32 +1,51 @@
-const usuariosGet = (req, res) => {
-    const { query,
-            nombre = 'No existe',
-            page = 1,
-            limit} = req.query;
+const bcryptjs = require('bcryptjs');
+const Usuario = require('../models/usuario');
+
+const query = { estado: true };
+
+const usuariosGet = async(req, res) => {
+    const { limite = 5, desde = 0 } = req.query;
+
+    const [total, usuarios] = await Promise.all([
+        Usuario.countDocuments(query),
+        Usuario.find(query)
+        .skip(Number(desde))
+        .limit(Number(limite))
+    ]);
+
     res.json({
-        msg: 'Es una petición GET - controlador',
-        query,
-        nombre,
-        page,
-        limit
+        total,
+        usuarios
     });
 }
 
-const usuariosPost = (req, res) => {
-    const {nombre, edad} = req.body;
+const usuariosPost = async (req, res) => {
+
+    const { nombre, correo, contraseña, rol} = req.body;
+    const usuario = new Usuario( {nombre, correo, contraseña, rol} );
+
+    const salt = bcryptjs.genSaltSync();
+    usuario.contraseña = bcryptjs.hashSync( contraseña, salt );
+
+    await usuario.save();
+
     res.json({
-        msg: 'Es una petición POST - controlador',
-        nombre,
-        edad
+        usuario
     });
 }
 
-const usuariosPut = (req, res) => {
+const usuariosPut = async(req, res) => {
     const id = req.params.id;
-    res.json({
-        msg: 'Es una petición PUT - controlador',
-        id
-    });
+    const { _id, contraseña, google, correo, ...resto} = req.body;
+
+    if( contraseña ){
+        const salt = bcryptjs.genSaltSync();
+        resto.contraseña = bcryptjs.hashSync( contraseña, salt );
+    }
+
+    const usuario = await Usuario.findByIdAndUpdate( id, resto );
+
+    res.json(usuario);
 }
 
 const usuariosPatch = (req, res) => {
@@ -35,10 +54,12 @@ const usuariosPatch = (req, res) => {
     });
 }
 
-const usuariosDelete = (req, res) => {
-    res.json({
-        msg: 'Es una petición DELETE - controlador'
-    });
+const usuariosDelete = async(req, res) => {
+    const {id} = req.params;
+
+    const usuario = await Usuario.findByIdAndUpdate( id, {estado: false} );
+
+    res.json(usuario);
 }
 
 module.exports = {
